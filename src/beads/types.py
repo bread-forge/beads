@@ -144,7 +144,7 @@ class CampaignBead(BaseModel):
 NodeType = Literal[
     "research", "plan", "build", "merge", "readme", "wait", "consensus", "design_doc"
 ]
-NodeState = Literal["pending", "running", "done", "failed", "abandoned", "wont-do"]
+NodeState = Literal["pending", "running", "done", "failed", "abandoned", "wont-do", "already-done"]
 
 
 class PlanArtifact(BaseModel):
