@@ -3,6 +3,8 @@
 from beads.store import BeadStore
 from beads.types import (
     CampaignBead,
+    CycleBead,
+    FindingBead,
     GraphNode,
     MergeQueue,
     MergeQueueItem,
@@ -12,7 +14,9 @@ from beads.types import (
     NodeType,
     PlanArtifact,
     PRBead,
+    ProposalBead,
     PRState,
+    SuppressionBead,
     WorkBead,
     WorkState,
 )
@@ -20,6 +24,8 @@ from beads.types import (
 __all__ = [
     "BeadStore",
     "CampaignBead",
+    "CycleBead",
+    "FindingBead",
     "GraphNode",
     "MergeQueue",
     "MergeQueueItem",
@@ -30,6 +36,8 @@ __all__ = [
     "PRBead",
     "PRState",
     "PlanArtifact",
+    "ProposalBead",
+    "SuppressionBead",
     "WorkBead",
     "WorkState",
 ]

@@ -188,3 +188,106 @@ class GraphNode(BaseModel):
 
     def touch_completed(self) -> None:
         self.completed_at = datetime.now(UTC)
+
+
+# ---------------------------------------------------------------------------
+# FindingBead
+# ---------------------------------------------------------------------------
+
+
+class FindingBead(BaseModel):
+    """A gap finding from repo-audit."""
+
+    id: str
+    agent: str
+    timestamp: datetime
+    staleness_class: Literal["critical", "dependency", "structural", "architectural"]
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence_chain: list[str] = Field(default_factory=list)
+    reasoning: str
+    severity: Literal["critical", "high", "medium", "low"]
+    blast_radius: dict[str, Any] = Field(default_factory=dict)
+    """e.g. {"modules_affected": ["executor.py"], "centrality": 0.7}"""
+    repo: str
+    cycle_id: str
+    reasoning_extended: str | None = None
+    remediation_sketch: str | None = None
+    enrichment_cost_usd: float | None = None
+
+
+# ---------------------------------------------------------------------------
+# CycleBead
+# ---------------------------------------------------------------------------
+
+
+class CycleBead(BaseModel):
+    """Tracks a pipeline cycle through its phases."""
+
+    cycle_id: str
+    repo: str
+    phase: Literal["analysis", "synthesis", "gate", "execution", "verification", "complete"] = (
+        "analysis"
+    )
+    trigger: str | None = None
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
+    finding_count: int = 0
+    proposal_count: int = 0
+    total_cost_usd: float = 0.0
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    def touch(self) -> None:
+        self.updated_at = datetime.now(UTC)
+
+
+# ---------------------------------------------------------------------------
+# ProposalBead
+# ---------------------------------------------------------------------------
+
+
+class ProposalBead(BaseModel):
+    """Tracks a spec proposal through the gate."""
+
+    proposal_id: str
+    cycle_id: str
+    repo: str
+    spec_hash: str
+    spec_path: str
+    status: Literal[
+        "pending", "approved", "rejected", "deferred", "dispatched", "verified", "failed"
+    ] = "pending"
+    gate_decision_at: datetime | None = None
+    decision_by: str | None = None
+    human_diff_hash: str | None = None
+    review_seconds: float | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    def touch(self) -> None:
+        self.updated_at = datetime.now(UTC)
+
+
+# ---------------------------------------------------------------------------
+# SuppressionBead
+# ---------------------------------------------------------------------------
+
+
+class SuppressionBead(BaseModel):
+    """Gate rejection/deferral record."""
+
+    suppression_id: str
+    finding_class: str
+    """Dot-separated: '{agent}.{gap-type}.{location}', e.g. 'repo-audit.integration-gap.executor'"""
+    decision: Literal["rejected", "deferred"]
+    reason: str
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime | None = None
+    """None = permanent rejection"""
+    conditions: str | None = None
+    """'Re-surface if: ...' — shown in gate when suppressed finding reappears"""
+
+    def is_active(self) -> bool:
+        if self.expires_at is None:
+            return True
+        return datetime.now(UTC) < self.expires_at
