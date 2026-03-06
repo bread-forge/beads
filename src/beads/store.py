@@ -19,13 +19,17 @@ from pathlib import Path
 
 from beads.types import (
     CampaignBead,
+    CycleBead,
+    FindingBead,
     GraphNode,
     MergeQueue,
     MergeQueueItem,
     NodeState,
     NodeType,
     PRBead,
+    ProposalBead,
     PRState,
+    SuppressionBead,
     WorkBead,
     WorkState,
 )
@@ -41,11 +45,19 @@ class BeadStore:
         self._prs_dir = self._root / "prs"
         self._graph_dir = self._root / "graph"
         self._research_dir = self._root / "research"
+        self._findings_dir = self._root / "findings"
+        self._cycles_dir = self._root / "cycles"
+        self._proposals_dir = self._root / "proposals"
+        self._suppressions_dir = self._root / "suppressions"
         self._root.mkdir(parents=True, exist_ok=True)
         self._work_dir.mkdir(exist_ok=True)
         self._prs_dir.mkdir(exist_ok=True)
         self._graph_dir.mkdir(exist_ok=True)
         self._research_dir.mkdir(exist_ok=True)
+        self._findings_dir.mkdir(exist_ok=True)
+        self._cycles_dir.mkdir(exist_ok=True)
+        self._proposals_dir.mkdir(exist_ok=True)
+        self._suppressions_dir.mkdir(exist_ok=True)
 
     # --- Work beads ---
 
@@ -217,6 +229,98 @@ class BeadStore:
         if not path.exists():
             return None
         return path.read_text(encoding="utf-8")
+
+    # --- Findings ---
+
+    def write_finding(self, finding: FindingBead) -> None:
+        path = self._findings_dir / f"{finding.id}.json"
+        self._atomic_write(path, finding.model_dump(mode="json"))
+
+    def read_finding(self, finding_id: str) -> FindingBead | None:
+        path = self._findings_dir / f"{finding_id}.json"
+        if not path.exists():
+            return None
+        return FindingBead.model_validate(self._read_json(path))
+
+    def list_findings(self, repo: str | None = None) -> list[FindingBead]:
+        findings = []
+        for p in self._findings_dir.glob("*.json"):
+            try:
+                f = FindingBead.model_validate(self._read_json(p))
+                if repo and f.repo != repo:
+                    continue
+                findings.append(f)
+            except Exception:
+                pass
+        return findings
+
+    # --- Cycles ---
+
+    def write_cycle(self, cycle: CycleBead) -> None:
+        cycle.touch()
+        path = self._cycles_dir / f"{cycle.cycle_id}.json"
+        self._atomic_write(path, cycle.model_dump(mode="json"))
+
+    def read_cycle(self, cycle_id: str) -> CycleBead | None:
+        path = self._cycles_dir / f"{cycle_id}.json"
+        if not path.exists():
+            return None
+        return CycleBead.model_validate(self._read_json(path))
+
+    # --- Proposals ---
+
+    def write_proposal(self, proposal: ProposalBead) -> None:
+        proposal.touch()
+        path = self._proposals_dir / f"{proposal.proposal_id}.json"
+        self._atomic_write(path, proposal.model_dump(mode="json"))
+
+    def read_proposal(self, proposal_id: str) -> ProposalBead | None:
+        path = self._proposals_dir / f"{proposal_id}.json"
+        if not path.exists():
+            return None
+        return ProposalBead.model_validate(self._read_json(path))
+
+    def list_proposals(
+        self,
+        repo: str | None = None,
+        status: str | None = None,
+    ) -> list[ProposalBead]:
+        proposals = []
+        for p in self._proposals_dir.glob("*.json"):
+            try:
+                proposal = ProposalBead.model_validate(self._read_json(p))
+                if repo and proposal.repo != repo:
+                    continue
+                if status and proposal.status != status:
+                    continue
+                proposals.append(proposal)
+            except Exception:
+                pass
+        return proposals
+
+    # --- Suppressions ---
+
+    def write_suppression(self, suppression: SuppressionBead) -> None:
+        path = self._suppressions_dir / f"{suppression.suppression_id}.json"
+        self._atomic_write(path, suppression.model_dump(mode="json"))
+
+    def read_suppression(self, suppression_id: str) -> SuppressionBead | None:
+        path = self._suppressions_dir / f"{suppression_id}.json"
+        if not path.exists():
+            return None
+        return SuppressionBead.model_validate(self._read_json(path))
+
+    def list_active_suppressions(self, repo: str | None = None) -> list[SuppressionBead]:
+        suppressions = []
+        for p in self._suppressions_dir.glob("*.json"):
+            try:
+                s = SuppressionBead.model_validate(self._read_json(p))
+                if not s.is_active():
+                    continue
+                suppressions.append(s)
+            except Exception:
+                pass
+        return suppressions
 
     # --- Internal helpers ---
 
