@@ -267,6 +267,24 @@ class BeadStore:
             return None
         return CycleBead.model_validate(self._read_json(path))
 
+    def list_cycles(
+        self,
+        repo: str | None = None,
+        phase: str | None = None,
+    ) -> list[CycleBead]:
+        cycles = []
+        for p in self._cycles_dir.glob("*.json"):
+            try:
+                c = CycleBead.model_validate(self._read_json(p))
+                if repo and c.repo != repo:
+                    continue
+                if phase and c.phase != phase:
+                    continue
+                cycles.append(c)
+            except Exception:
+                pass
+        return cycles
+
     # --- Proposals ---
 
     def write_proposal(self, proposal: ProposalBead) -> None:
@@ -309,6 +327,18 @@ class BeadStore:
         if not path.exists():
             return None
         return SuppressionBead.model_validate(self._read_json(path))
+
+    def list_suppressions(self, finding_class: str | None = None) -> list[SuppressionBead]:
+        suppressions = []
+        for p in self._suppressions_dir.glob("*.json"):
+            try:
+                s = SuppressionBead.model_validate(self._read_json(p))
+                if finding_class and s.finding_class != finding_class:
+                    continue
+                suppressions.append(s)
+            except Exception:
+                pass
+        return suppressions
 
     def list_active_suppressions(self, repo: str | None = None) -> list[SuppressionBead]:
         suppressions = []
