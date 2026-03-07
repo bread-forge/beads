@@ -164,6 +164,8 @@ class PlanArtifact(BaseModel):
     """e.g. 'novel-domain', 'security', 'multi-module-coordination'."""
     module_dependencies: dict[str, list[str]] = Field(default_factory=dict)
     """module → list of modules that must be merged before it can build."""
+    new_dependencies: list[str] = Field(default_factory=list)
+    """Third-party packages to add to pyproject.toml before building, e.g. ['anthropic>=0.40', 'repo-audit']."""
 
 
 class GraphNode(BaseModel):
