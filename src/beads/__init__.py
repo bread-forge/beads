@@ -2,6 +2,7 @@
 
 from beads.store import BeadStore
 from beads.types import (
+    BeadWriter,
     CampaignBead,
     CycleBead,
     FindingBead,
@@ -14,6 +15,7 @@ from beads.types import (
     NodeType,
     PlanArtifact,
     PRBead,
+    PreflightBead,
     ProposalBead,
     PRState,
     SuppressionBead,
@@ -23,6 +25,7 @@ from beads.types import (
 
 __all__ = [
     "BeadStore",
+    "BeadWriter",
     "CampaignBead",
     "CycleBead",
     "FindingBead",
@@ -36,6 +39,7 @@ __all__ = [
     "PRBead",
     "PRState",
     "PlanArtifact",
+    "PreflightBead",
     "ProposalBead",
     "SuppressionBead",
     "WorkBead",

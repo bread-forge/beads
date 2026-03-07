@@ -11,6 +11,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from typing import Protocol, runtime_checkable
+
 # ---------------------------------------------------------------------------
 # WorkBead
 # ---------------------------------------------------------------------------
@@ -166,6 +168,11 @@ class PlanArtifact(BaseModel):
     """module → list of modules that must be merged before it can build."""
     new_dependencies: list[str] = Field(default_factory=list)
     """Third-party packages to add to pyproject.toml before building, e.g. ['anthropic>=0.40', 'repo-audit']."""
+    research_groups: dict[str, list[str]] = Field(default_factory=dict)
+    """Group name → list of unknowns in that group. Organizes research findings by domain."""
+    empirical_unknowns: list[str] = Field(default_factory=list)
+    """Questions that require running code or a live environment to answer — NOT web-researchable.
+    These do not generate research nodes. They become test stubs / risk flags in the build."""
 
 
 class GraphNode(BaseModel):
@@ -190,6 +197,45 @@ class GraphNode(BaseModel):
 
     def touch_completed(self) -> None:
         self.completed_at = datetime.now(UTC)
+
+
+# ---------------------------------------------------------------------------
+# ExecutionReport
+# ---------------------------------------------------------------------------
+
+
+class ModuleOutcome(BaseModel):
+    """Per-module result from a kiln graph run."""
+
+    module: str
+    files: list[str] = Field(default_factory=list)
+    issue_number: int | None = None
+    pr_number: int | None = None
+    model: str | None = None
+    state: str
+    """done | abandoned | pending"""
+
+
+class ExecutionReport(BaseModel):
+    """Structured record of a completed kiln graph run.
+
+    Written to disk at run completion so verification agents and meta-analysis
+    tools can consume execution history without querying live graph state.
+    """
+
+    milestone: str
+    repo: str
+    spec_file: str | None = None
+    started_at: datetime
+    completed_at: datetime
+    outcome: Literal["success", "partial", "failed"]
+    modules: list[ModuleOutcome] = Field(default_factory=list)
+    plan_confidence: float | None = None
+    empirical_unknowns: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
+    total_cost_usd: float = 0.0
+    node_counts: dict[str, int] = Field(default_factory=dict)
+    """State → count across all nodes in the graph."""
 
 
 # ---------------------------------------------------------------------------
@@ -293,3 +339,55 @@ class SuppressionBead(BaseModel):
         if self.expires_at is None:
             return True
         return datetime.now(UTC) < self.expires_at
+
+
+# ---------------------------------------------------------------------------
+# PreflightBead
+# ---------------------------------------------------------------------------
+
+
+class PreflightBead(BaseModel):
+    """Records a preflight routing decision for audit and dedup."""
+
+    id: str
+    """UUID for this preflight run."""
+    repo: str
+    spec_file: str
+    route: Literal["cc", "kiln"]
+    score: int
+    """Total score 0–8."""
+    confidence: float
+    volume: int
+    novelty: int
+    ambiguity: int
+    cross_cutting: int
+    summary: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+# ---------------------------------------------------------------------------
+# BeadWriter — structural protocol satisfied by BeadStore
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class BeadWriter(Protocol):
+    """Minimal write surface for bead state.
+
+    BeadStore satisfies this structurally.  CC orchestrators and kiln
+    internals type-annotate against BeadWriter so the file-based
+    implementation is not the only possible backend.
+    """
+
+    def write_work_bead(self, bead: WorkBead) -> None: ...
+    def read_work_bead(self, issue_number: int) -> WorkBead | None: ...
+    def write_pr_bead(self, bead: PRBead) -> None: ...
+    def read_pr_bead(self, pr_number: int) -> PRBead | None: ...
+    def list_work_beads(
+        self,
+        state: WorkState | None = None,
+        milestone: str | None = None,
+    ) -> list[WorkBead]: ...
+    def list_pr_beads(self, state: PRState | None = None) -> list[PRBead]: ...
+    def write_preflight_bead(self, bead: PreflightBead) -> None: ...
+    def read_preflight_bead(self, preflight_id: str) -> PreflightBead | None: ...

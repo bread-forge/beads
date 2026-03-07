@@ -20,6 +20,7 @@ from pathlib import Path
 from beads.types import (
     CampaignBead,
     CycleBead,
+    ExecutionReport,
     FindingBead,
     GraphNode,
     MergeQueue,
@@ -27,6 +28,7 @@ from beads.types import (
     NodeState,
     NodeType,
     PRBead,
+    PreflightBead,
     ProposalBead,
     PRState,
     SuppressionBead,
@@ -49,6 +51,8 @@ class BeadStore:
         self._cycles_dir = self._root / "cycles"
         self._proposals_dir = self._root / "proposals"
         self._suppressions_dir = self._root / "suppressions"
+        self._reports_dir = self._root / "reports"
+        self._preflight_dir = self._root / "preflight"
         self._root.mkdir(parents=True, exist_ok=True)
         self._work_dir.mkdir(exist_ok=True)
         self._prs_dir.mkdir(exist_ok=True)
@@ -58,6 +62,8 @@ class BeadStore:
         self._cycles_dir.mkdir(exist_ok=True)
         self._proposals_dir.mkdir(exist_ok=True)
         self._suppressions_dir.mkdir(exist_ok=True)
+        self._reports_dir.mkdir(exist_ok=True)
+        self._preflight_dir.mkdir(exist_ok=True)
 
     # --- Work beads ---
 
@@ -351,6 +357,59 @@ class BeadStore:
             except Exception:
                 pass
         return suppressions
+
+    # --- Execution reports ---
+
+    def write_execution_report(self, report: ExecutionReport) -> None:
+        ts = report.completed_at.strftime("%Y%m%dT%H%M%S")
+        filename = f"{report.milestone}-{ts}.json"
+        self._atomic_write(self._reports_dir / filename, report.model_dump(mode="json"))
+
+    def list_execution_reports(self, milestone: str | None = None) -> list[ExecutionReport]:
+        reports = []
+        for p in sorted(self._reports_dir.glob("*.json"), reverse=True):
+            try:
+                r = ExecutionReport.model_validate(self._read_json(p))
+                if milestone and r.milestone != milestone:
+                    continue
+                reports.append(r)
+            except Exception:
+                pass
+        return reports
+
+    def read_latest_execution_report(self, milestone: str | None = None) -> ExecutionReport | None:
+        reports = self.list_execution_reports(milestone=milestone)
+        return reports[0] if reports else None
+
+    # --- Preflight beads ---
+
+    def write_preflight_bead(self, bead: PreflightBead) -> None:
+        path = self._preflight_dir / f"{bead.id}.json"
+        self._atomic_write(path, bead.model_dump(mode="json"))
+
+    def read_preflight_bead(self, preflight_id: str) -> PreflightBead | None:
+        path = self._preflight_dir / f"{preflight_id}.json"
+        if not path.exists():
+            return None
+        return PreflightBead.model_validate(self._read_json(path))
+
+    def list_preflight_beads(
+        self,
+        repo: str | None = None,
+        route: str | None = None,
+    ) -> list[PreflightBead]:
+        beads = []
+        for p in sorted(self._preflight_dir.glob("*.json"), reverse=True):
+            try:
+                b = PreflightBead.model_validate(self._read_json(p))
+                if repo and b.repo != repo:
+                    continue
+                if route and b.route != route:
+                    continue
+                beads.append(b)
+            except Exception:
+                pass
+        return beads
 
     # --- Internal helpers ---
 
